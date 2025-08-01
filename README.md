@@ -41,7 +41,7 @@ Before installing the MSP Network Monitoring Tool, ensure you have:
 ### Step 1: Clone the Repository
 
 \`\`\`bash
-git clone https://github.com/your-username/msp-network-monitor.git
+git clone https://github.com/shaileshrichwal07/msp-network-monitor.git
 cd msp-network-monitor
 \`\`\`
 
