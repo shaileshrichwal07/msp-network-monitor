@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: msp-postgres
+    environment:
+      POSTGRES_DB: msp_network_monitor
+      POSTGRES_USER: msp_user
+      POSTGRES_PASSWORD: msp_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - msp-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: msp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - msp-network
+    restart: unless-stopped
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: msp-app
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://msp_user:msp_password@postgres:5432/msp_network_monitor
+      - REDIS_URL=redis://redis:6379
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key-here
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - msp-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: msp-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - msp-network
+    restart: unless-stopped
+
+  # Monitoring Agent (Python)
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: msp-agent
+    environment:
+      - API_BASE_URL=http://app:3000/api
+      - API_KEY=msp-demo-key-2024
+      - CLIENT_ID=docker-client
+      - LOCATION=Docker Container
+    depends_on:
+      - app
+    networks:
+      - msp-network
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  msp-network:
+    driver: bridge
